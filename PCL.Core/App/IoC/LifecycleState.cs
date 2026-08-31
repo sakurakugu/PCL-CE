@@ -91,7 +91,12 @@ partial class Lifecycle
     /// <param name="action">事件触发委托</param>
     public static void When(LifecycleState when, Action action)
     {
-        if (CurrentState >= when) return;
+        // 注册发生在目标状态之后时，不能丢弃回调；应立即执行？
+        if (CurrentState >= when)
+        {
+            // action();
+            return;
+        }
         StateChanged += TempHandler;
         return;
 

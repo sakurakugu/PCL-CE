@@ -91,7 +91,8 @@ internal static class LaunchCommandRunner
         try
         {
             // 页面会异步读取游戏目录和实例列表，命令模式必须等待该流程结束后再覆盖选择。
-            while (!Lifecycle.HasShutdownStarted && !IsLaunchPageReady())
+            var deadline = Environment.TickCount64 + 30000;
+            while (!Lifecycle.HasShutdownStarted && ModMain.frmLaunchLeft is null && Environment.TickCount64 < deadline)
                 Thread.Sleep(50);
             if (Lifecycle.HasShutdownStarted) return;
 
@@ -341,6 +342,8 @@ internal static class LaunchCommandRunner
         if (profile is not null)
         {
             ProfileService.Select(profile);
+            // CLI 启动可能发生在档案页首次加载之后，主动刷新以显示当前档案。
+            ModMain.frmLoginProfile?.RefreshProfileList();
             ModLaunch.McLaunchLog($"非交互模式已选择离线档案 {username}");
             return;
         }
@@ -356,6 +359,8 @@ internal static class LaunchCommandRunner
             ClientToken = uuid,
             ProfileId = Guid.NewGuid().ToString("N")
         });
+        // 档案页可能已经缓存了空列表；创建后立即同步界面。
+        ModMain.frmLoginProfile?.RefreshProfileList();
         ModLaunch.McLaunchLog($"非交互模式已创建并选择离线档案 {username}");
     }
 
