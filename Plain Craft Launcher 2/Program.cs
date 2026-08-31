@@ -15,7 +15,10 @@ internal static class Program
     [STAThread]
     public static void Main()
     {
+        // 如果是CLI打开，如果不开新的控制台，就将数据传入到父进程的CLI中
         if (Basics.CommandLineArguments.Contains("--console")) KernelInterop.AllocateConsole();
+        else if (!KernelInterop.TryAttachParentConsole()) KernelInterop.RefreshConsoleStreams();
+        if (CliHelp.TryHandleStandalone()) return;
 #if DEBUG
         if (Basics.CommandLineArguments.Contains("--debug"))
         {

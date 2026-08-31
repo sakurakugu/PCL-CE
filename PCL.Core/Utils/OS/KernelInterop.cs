@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -61,10 +62,16 @@ public static partial class KernelInterop
     }
 
     private const int ERROR_ACCESS_DENIED = 5;
+    private const int ERROR_INVALID_HANDLE = 6; // 父进程没有控制台时返回 false；已经有控制台时视为成功。
+    private const uint ATTACH_PARENT_PROCESS = uint.MaxValue;
 
     [LibraryImport("kernel32.dll", EntryPoint = "AllocConsole")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool _AllocConsole();
+
+    [LibraryImport("kernel32.dll", EntryPoint = "AttachConsole", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool _AttachConsole(uint processId);
 
     [LibraryImport("kernel32.dll", EntryPoint = "FreeConsole")]
     private static partial void _FreeConsole();
@@ -75,6 +82,15 @@ public static partial class KernelInterop
     // ReSharper restore InconsistentNaming, UnusedMember.Local
 
     private static void _ThrowLastWin32Error(int? errorCode = null) => throw new Win32Exception(errorCode ?? Marshal.GetLastWin32Error());
+
+    /// <summary>
+    /// 按当前标准句柄重新绑定 <see cref="Console.Out"/> 和 <see cref="Console.Error"/>。
+    /// </summary>
+    public static void RefreshConsoleStreams()
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput(), Console.OutputEncoding) { AutoFlush = true });
+        Console.SetError(new StreamWriter(Console.OpenStandardError(), Console.OutputEncoding) { AutoFlush = true });
+    }
 
     /// <summary>
     /// 获取当前线程的 Win32 Thread ID。若无特殊情况请用 <see cref="Thread.ManagedThreadId"/> 而不是这个方法。
@@ -250,9 +266,36 @@ public static partial class KernelInterop
     /// </summary>
     public static void AllocateConsole()
     {
-        if (_AllocConsole()) return;
+        if (_AllocConsole())
+        {
+            RefreshConsoleStreams();
+            return;
+        }
         var lastError = Marshal.GetLastWin32Error();
         if (lastError != ERROR_ACCESS_DENIED) _ThrowLastWin32Error(lastError);
+        RefreshConsoleStreams();
+    }
+
+    /// <summary>
+    /// 尝试附加到父进程的终端窗口。
+    /// </summary>
+    /// <returns>成功附加、或当前进程已有关联终端时返回 <see langword="true"/>；父进程没有终端时返回 <see langword="false"/>。</returns>
+    public static bool TryAttachParentConsole()
+    {
+        if (_AttachConsole(ATTACH_PARENT_PROCESS))
+        {
+            RefreshConsoleStreams();
+            return true;
+        }
+        var lastError = Marshal.GetLastWin32Error();
+        if (lastError == ERROR_ACCESS_DENIED)
+        {
+            RefreshConsoleStreams();
+            return true;
+        }
+        if (lastError == ERROR_INVALID_HANDLE) return false;
+        _ThrowLastWin32Error(lastError);
+        return false;
     }
 
     /// <summary>
