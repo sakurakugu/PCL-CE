@@ -45,11 +45,19 @@ public static class ModLaunch
         if (ModBase.IsUtf8CodePage() && !States.Hint.NonAsciiGamePath &&
             !ModInstanceList.McMcInstanceSelected.PathInstance.IsASCII())
         {
-            var userChoice = ModMain.MyMsgBox(
-                Lang.Text("Minecraft.Launch.Precheck.NonAsciiPath.Message", ModInstanceList.McMcInstanceSelected.Name),
-                Lang.Text("Minecraft.Launch.Precheck.NonAsciiPath.Title"), Lang.Text("Minecraft.Launch.Precheck.NonAsciiPath.Continue"), Lang.Text("Minecraft.Launch.Precheck.NonAsciiPath.Back"), Lang.Text("Common.Hint.DoNotShowAgain"));
-            if (userChoice == 2) throw new Exception("$$");
-            if (userChoice == 3) States.Hint.NonAsciiGamePath = true;
+            // 非交互模式，无需用户操作，弹出警告即可
+            if (currentLaunchOptions?.IsNonInteractive == true)
+            {
+                McLaunchLog($"警告：实例 {ModInstanceList.McMcInstanceSelected.Name} 的路径包含非 ASCII 字符");
+            }
+            else
+            {
+                var userChoice = ModMain.MyMsgBox(
+                    Lang.Text("Minecraft.Launch.Precheck.NonAsciiPath.Message", ModInstanceList.McMcInstanceSelected.Name),
+                    Lang.Text("Minecraft.Launch.Precheck.NonAsciiPath.Title"), Lang.Text("Minecraft.Launch.Precheck.NonAsciiPath.Continue"), Lang.Text("Minecraft.Launch.Precheck.NonAsciiPath.Back"), Lang.Text("Common.Hint.DoNotShowAgain"));
+                if (userChoice == 2) throw new Exception("$$");
+                if (userChoice == 3) States.Hint.NonAsciiGamePath = true;
+            }
         }
 
         // 检查实例
@@ -144,7 +152,11 @@ public static class ModLaunch
         // 正版购买提示
         if (!ProfileService.HasMicrosoftProfile)
         {
-            if (Lang.IsFeaturesUnrestricted)
+            if (currentLaunchOptions?.IsNonInteractive == true)
+            {
+                McLaunchLog($"警告：未找到正版档案，非交互模式将使用当前的 {selectedProfile.ProfileType} 档案继续启动");
+            }
+            else if (Lang.IsFeaturesUnrestricted)
             {
                 if (ModMain.MyMsgBox(
                         Lang.Text("Minecraft.Launch.PurchaseHint.Message"),
@@ -202,6 +214,11 @@ public static class ModLaunch
         public McInstance instance = null;
 
         /// <summary>
+        ///     是否由非交互式自动化调用。启用后，启动失败只记录日志并由调用方处理，不显示提示或弹窗。需要用户选择或确认的操作会默认失败。
+        /// </summary>
+        public bool IsNonInteractive = false;
+
+        /// <summary>
         ///     是否为 “测试游戏” 按钮启动的游戏。
         ///     如果是，则显示游戏实时日志。
         /// </summary>
@@ -239,7 +256,8 @@ public static class ModLaunch
             throw new Exception("McLaunchStart 必须在 UI 线程调用！");
         if (mcLaunchLoader.State == ModBase.LoadState.Loading)
         {
-            HintService.Hint(Lang.Text("Minecraft.Launch.Error.AlreadyLaunching"), HintType.Error);
+            if (!currentLaunchOptions.IsNonInteractive)  // 非交互模式不弹窗
+                HintService.Hint(Lang.Text("Minecraft.Launch.Error.AlreadyLaunching"), HintType.Error);
             isLaunching = false;
             return false;
         }
@@ -253,7 +271,8 @@ public static class ModLaunch
             currentLaunchOptions.instance.Load();
             if (currentLaunchOptions.instance.state == McInstanceState.Error)
             {
-                HintService.Hint(Lang.Text("Minecraft.Launch.Error.CannotLaunch", currentLaunchOptions.instance.Desc), HintType.Error);
+                if (!currentLaunchOptions.IsNonInteractive)
+                    HintService.Hint(Lang.Text("Minecraft.Launch.Error.CannotLaunch", currentLaunchOptions.instance.Desc), HintType.Error);
                 isLaunching = false;
                 return false;
             }
@@ -332,7 +351,7 @@ public static class ModLaunch
         }
         catch (Exception ex)
         {
-            if (!ex.Message.StartsWithF("$$"))
+            if (!currentLaunchOptions.IsNonInteractive && !ex.Message.StartsWithF("$$")) // 非交互模式不弹窗
                 HintService.Hint(Lang.Text("Minecraft.Launch.Precheck.Failed.WithDetail", ex.Message), HintType.Error);
             throw;
         }
@@ -381,15 +400,17 @@ public static class ModLaunch
             {
                 case ModBase.LoadState.Finished:
                 {
-                    HintService.Hint(Lang.Text("Minecraft.Launch.Success", ModInstanceList.McMcInstanceSelected.Name), HintType.Success);
+                    if (!currentLaunchOptions.IsNonInteractive)
+                        HintService.Hint(Lang.Text("Minecraft.Launch.Success", ModInstanceList.McMcInstanceSelected.Name), HintType.Success);
                     break;
                 }
                 case ModBase.LoadState.Aborted:
                 {
-                    if (abortHint is null)
-                        HintService.Hint(currentLaunchOptions?.SaveBatch is null ? Lang.Text("Minecraft.Launch.Cancelled") : Lang.Text("Minecraft.Launch.ExportScript.Cancelled"));
-                    else
-                        HintService.Hint(abortHint, HintType.Success);
+                    if (!currentLaunchOptions.IsNonInteractive)
+                        if (abortHint is null)
+                            HintService.Hint(currentLaunchOptions?.SaveBatch is null ? Lang.Text("Minecraft.Launch.Cancelled") : Lang.Text("Minecraft.Launch.ExportScript.Cancelled"));
+                        else
+                            HintService.Hint(abortHint, HintType.Success);
 
                     break;
                 }
@@ -415,7 +436,7 @@ public static class ModLaunch
                 {
                     // 若有以 $ 开头的错误信息，则以此为准显示提示
                     // 若错误信息为 $$，则不提示
-                    if (currentEx.Message != "$$")
+                    if (!currentLaunchOptions.IsNonInteractive && currentEx.Message != "$$")
                         ModMain.MyMsgBox(
                             Lang.Text("Minecraft.Launch.Error.SpecialMessage.WithDetail",
                                 currentEx.Message.TrimStart('$')),
@@ -439,7 +460,7 @@ public static class ModLaunch
                 currentLaunchOptions?.SaveBatch is null
                     ? "Minecraft launch failed"
                     : "Export script failed",
-                ModBase.LogLevel.Msgbox,
+                currentLaunchOptions.IsNonInteractive ? ModBase.LogLevel.Normal : ModBase.LogLevel.Msgbox,
                 currentLaunchOptions?.SaveBatch is null
                     ? Lang.Text("Launch.Error.Title")
                     : Lang.Text("Launch.Error.ExportScriptTitle"),
@@ -615,7 +636,7 @@ public static class ModLaunch
             ModBase.Log(
                 ex,
                 Lang.Text("Minecraft.Launch.Login.Error.Input"),
-                ModBase.LogLevel.Feedback,
+                currentLaunchOptions?.IsNonInteractive == true ? ModBase.LogLevel.Normal : ModBase.LogLevel.Feedback,
                 userSummary: Lang.Text("Minecraft.Launch.Login.Error.Input"));
         }
 
@@ -723,6 +744,8 @@ public static class ModLaunch
     {
         token.ThrowIfCancellationRequested();
         LogWrapper.Info("Profile","获取正版 OAuth Token 失败：" + exception);
+        if (currentLaunchOptions?.IsNonInteractive == true)
+            return Task.FromResult(false); // 非交互模式下不弹出UI
         var reuseCachedProfile = false;
         ModBase.RunInUiWait(() =>
         {
@@ -778,6 +801,8 @@ public static class ModLaunch
     {
         if (candidates.Count == 0) return null;
         if (candidates.Count == 1) return candidates[0];
+        if (currentLaunchOptions?.IsNonInteractive == true)
+            throw new InvalidOperationException("非交互模式无法从多个第三方账号中选择档案。");
         AuthenticationCandidate? selected = null;
         ModBase.RunInUiWait(() =>
         {
@@ -1031,7 +1056,8 @@ public static class ModLaunch
             // 无合适的 Java
             if (task.IsAborted)
                 return; // 中断加载会导致 JavaSelect 异常地返回空值，误判找不到 Java
-            McLaunchLog("无合适的 Java，需要确认是否自动下载");
+            var isNonInteractive = currentLaunchOptions?.IsNonInteractive == true;
+            McLaunchLog(isNonInteractive ? "无合适的 Java，将自动下载" : "无合适的 Java，需要确认是否自动下载");
             string javaCode;
             if (minVer >= new Version(1, 9))
             {
@@ -1040,17 +1066,27 @@ public static class ModLaunch
             else if (maxVer < new Version(1, 8))
             {
                 if (ModInstanceList.McMcInstanceSelected.Info.HasForge)
+                {
+                    if (isNonInteractive)
+                        throw new Exception(Lang.Text("Minecraft.Launch.Java.NeedLegacyJavaFixerOrJava7"));
                     ModMain.MyMsgBox(
                         Lang.Text("Minecraft.Launch.Java.NeedLegacyJavaFixerOrJava7"),
                         Lang.Text("Minecraft.Launch.Java.NotFound.Title"));
+                }
                 else
+                {
+                    if (isNonInteractive)
+                        throw new Exception(Lang.Text("Minecraft.Launch.Java.NeedJava7"));
                     ModMain.MyMsgBox(
                         Lang.Text("Minecraft.Launch.Java.NeedJava7"),
                         Lang.Text("Minecraft.Launch.Java.NotFound.Title"));
+                }
                 throw new Exception("$$");
             }
             else if (minVer > new Version(1, 8, 0, 140) && maxVer < new Version(1, 8, 0, 321))
             {
+                if (isNonInteractive)
+                    throw new Exception(Lang.Text("Minecraft.Launch.Java.NeedJava8U141ToU320"));
                 ModMain.MyMsgBox(
                     Lang.Text("Minecraft.Launch.Java.NeedJava8U141ToU320"),
                     Lang.Text("Minecraft.Launch.Java.NotFound.Title"));
@@ -1058,6 +1094,8 @@ public static class ModLaunch
             }
             else if (minVer > new Version(1, 8, 0, 140))
             {
+                if (isNonInteractive)
+                    throw new Exception(Lang.Text("Minecraft.Launch.Java.NeedJava8U141OrLater"));
                 ModMain.MyMsgBox(
                     Lang.Text("Minecraft.Launch.Java.NeedJava8U141OrLater"),
                     Lang.Text("Minecraft.Launch.Java.NotFound.Title"));
@@ -1068,7 +1106,9 @@ public static class ModLaunch
                 javaCode = 8.ToString();
             }
 
-            if (!ModJava.JavaDownloadConfirm($"Java {javaCode}"))
+            if (isNonInteractive)
+                McLaunchLog($"警告：未找到合适的 Java，将自动下载 Java {javaCode}");
+            else if (!ModJava.JavaDownloadConfirm($"Java {javaCode}"))
                 throw new Exception("$$");
             // 开始自动下载
             var javaLoader = ModJava.GetJavaDownloadLoader();
@@ -1096,8 +1136,10 @@ public static class ModLaunch
             }
             else
             {
-                HintService.Hint(Lang.Text("Minecraft.Launch.Error.NoJava"), HintType.Error);
-                throw new Exception("$$");
+                if (!isNonInteractive)
+                    HintService.Hint(Lang.Text("Minecraft.Launch.Error.NoJava"), HintType.Error);
+                // 非交互模式不弹出提示框，直接抛出异常
+                throw new Exception(isNonInteractive ? Lang.Text("Minecraft.Launch.Error.NoJava") : "$$");
             }
         }
     }

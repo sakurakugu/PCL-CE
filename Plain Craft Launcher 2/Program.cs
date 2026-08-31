@@ -38,6 +38,8 @@ internal static class Program
         };
         // From dotnet/wpf #2393: fix tablet devices broken on .NET Core 3.0+
         _ = Tablet.TabletDevices;
+        // 等待窗口初始化回调完成后再注册并处理游戏启动命令。
+        Lifecycle.When(LifecycleState.Running, LaunchCommandRunner.TryHandle);
         // Start lifecycle
         Lifecycle.OnInitialize();
     }
