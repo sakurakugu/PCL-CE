@@ -16,6 +16,7 @@
 *.userprefs
 
 # Build results
+[Bb]uild/
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
@@ -351,3 +352,7 @@ MaskFiles/
 
 tmp/
 temp/
+
+# 其他
+
+AGENTS.md

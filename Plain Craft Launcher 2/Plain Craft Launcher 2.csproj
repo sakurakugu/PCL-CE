@@ -118,4 +118,20 @@
     <ItemGroup>
         <Content Include="LICENCE" />
     </ItemGroup>
+
+    <!-- 发布完成后，将可独立运行的单文件复制到仓库根目录的 build 文件夹。 -->
+    <!-- 放到没空格的文件夹，并改名成PCL2_Debug.exe或PCL2_Release.exe，方便测试 -->
+    <Target Name="CopyPublishedLauncherToBuild"
+            AfterTargets="Publish"
+            Condition="'$(Configuration)' == 'Debug' Or '$(Configuration)' == 'Release'">
+        <PropertyGroup>
+            <BuildOutputDirectory>$(MSBuildProjectDirectory)\..\build\</BuildOutputDirectory>
+            <BuildLauncherPath>$(BuildOutputDirectory)PCL2_$(Configuration).exe</BuildLauncherPath>
+        </PropertyGroup>
+        <MakeDir Directories="$(BuildOutputDirectory)" />
+        <Copy SourceFiles="$(PublishDir)Plain Craft Launcher 2.exe"
+              DestinationFiles="$(BuildLauncherPath)"
+              SkipUnchangedFiles="false" />
+        <Message Importance="High" Text="已复制发布文件到 $(BuildLauncherPath)" />
+    </Target>
 </Project>
