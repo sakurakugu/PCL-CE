@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading;
 using PCL.Core.App;
@@ -21,6 +22,12 @@ internal static class LaunchCommandRunner
     private const string DefaultUsername = "Steve";
     private const string ResultPrefix = "PCL_CLI_RESULT=";
     private static int _isCompleted;
+
+    // CLI 结果直接面向终端用户，保留中文字符而不是输出为 \\uXXXX。
+    private static readonly JsonSerializerOptions CliJsonSerializerOptions = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
 
     /// <summary>
     /// 注册 launch 命令回调并处理启动时已经收到的命令。
@@ -376,7 +383,9 @@ internal static class LaunchCommandRunner
         try
         {
             message = message is null ? null : McLogFilter.FilterUserName(McLogFilter.FilterAccessToken(message, '*'), '*');
-            var result = JsonSerializer.Serialize(new { status, stage, instance, message, pid, log = @"PCL\Log" });
+            var result = JsonSerializer.Serialize(
+                new { status, stage, instance, message, pid, log = @"PCL\Log" },
+                CliJsonSerializerOptions);
             Console.WriteLine(ResultPrefix + result);
         }
         finally
