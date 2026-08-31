@@ -118,6 +118,7 @@ public sealed partial class StartupService
             ("activate", []),
             ("promote", []),
             ("launch", []),
+            ("config", []),
         ];
         Context.Debug("正在解析命令行参数...");
         var c = CommandLine.Parse(Basics.FullCommandLineArguments, subcommands);

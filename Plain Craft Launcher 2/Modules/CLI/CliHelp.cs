@@ -11,7 +11,7 @@ namespace PCL;
 /// </summary>
 internal static class CliHelp
 {
-    private static readonly string[] KnownCommands = ["launch", "update", "activate", "promote"];
+    private static readonly string[] KnownCommands = ["launch", "config", "update", "activate", "promote"];
 
     /// <summary>
     /// 处理不带子命令的全局 --help。返回是否已处理。
@@ -35,10 +35,11 @@ internal static class CliHelp
             "用法：PCL <命令> [选项]\n" +
             "命令：\n" +
             "  launch      启动 Minecraft 实例\n" +
+            "  config      查看或修改启动器配置项\n" +
             "  update      执行更新操作\n" +
             "  activate    激活启动器\n" +
             "  promote     执行推广操作\n" +
-            "使用 PCL launch --help 查看启动命令的详细帮助。");
+            "使用 PCL <命令> --help 查看对应命令的详细帮助。");
     }
 
     public static void ShowLaunchHelp()
@@ -52,5 +53,20 @@ internal static class CliHelp
             "  --username  离线用户名（默认 Steve）\n" +
             "  --help      显示此帮助信息");
         Lifecycle.Shutdown((int)ModBase.ProcessReturnValues.Success);
+    }
+
+    public static void ShowConfigHelp(bool shutdown = true)
+    {
+        Console.WriteLine(
+            "PCL config - 查看或修改启动器配置项\n" +
+            "用法：PCL config [操作] [--help]\n" +
+            "操作：\n" +
+            "  --list                      列出可通过 CLI 管理的配置项\n" +
+            "  --get <键>                  查看配置项\n" +
+            "  --set <键=值>               修改配置项\n" +
+            "  --reset <键>                恢复配置项默认值\n" +
+            "  --help                      显示此帮助信息\n" +
+            "仅支持非敏感的全局配置；加密配置和实例级配置不可通过 CLI 修改。\n");
+        if (shutdown) Lifecycle.Shutdown((int)ModBase.ProcessReturnValues.Success);
     }
 }

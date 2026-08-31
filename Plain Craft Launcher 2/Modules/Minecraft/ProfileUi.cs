@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Windows;
+using PCL.Core.App;
 using PCL.Core.App.Localization;
 using PCL.Core.IO.Net;
 using PCL.Core.Logging;
@@ -184,7 +185,10 @@ public static class ProfileUi
 #if DEBUG || DEBUGCI
         return true;
 #else
-        return ProfileService.HasMicrosoftProfile || (Lang.IsFeaturesUnrestricted && ProfileService.Profiles.Count > 0) || NetworkHelper.IsNetworkAvailable() is false;
+        return Config.Launch.SkipProfileAuthRequirement ||
+               ProfileService.HasMicrosoftProfile ||
+               (Lang.IsFeaturesUnrestricted && ProfileService.Profiles.Count > 0) ||
+               NetworkHelper.IsNetworkAvailable() is false;
 #endif
     }
 

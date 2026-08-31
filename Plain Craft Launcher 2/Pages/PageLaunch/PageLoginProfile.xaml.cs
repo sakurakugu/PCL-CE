@@ -47,7 +47,8 @@ public partial class PageLoginProfile
         {
             foreach (var p in ProfileService.Profiles)
                 ProfileCollection.Add(new ProfileItem(p));
-            HintMicrosoft.Visibility = ProfileService.Profiles.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            // 只有确实需要先进行正版验证时才显示提示（与新建档案可选验证方式的判断保持一致）
+            HintMicrosoft.Visibility = ProfileUi.CanCreateOtherProfile() ? Visibility.Collapsed : Visibility.Visible;
             ModBase.Log("[Profile] 档案列表刷新完成");
         }
         catch (Exception ex)

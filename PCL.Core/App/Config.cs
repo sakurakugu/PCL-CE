@@ -597,6 +597,11 @@ public static partial class Config
         /// 正版登录方式。
         /// </summary>
         [ConfigItem<int>("LoginMsAuthType", 1)] public partial int LoginMsAuthType { get; set; }
+
+        /// <summary>
+        /// 跳过创建档案时的正版账号要求。
+        /// </summary>
+        [ConfigItem<bool>("LaunchSkipProfileAuthRequirement", false)] public partial bool SkipProfileAuthRequirement { get; set; }
     }
 
     /// <summary>

@@ -43,6 +43,8 @@ internal static class Program
         _ = Tablet.TabletDevices;
         // 等待窗口初始化回调完成后再注册并处理游戏启动命令。
         Lifecycle.When(LifecycleState.Running, LaunchCommandRunner.TryHandle);
+        // 同上理
+        Lifecycle.When(LifecycleState.Running, ConfigCommandRunner.TryHandle);
         // Start lifecycle
         Lifecycle.OnInitialize();
     }
