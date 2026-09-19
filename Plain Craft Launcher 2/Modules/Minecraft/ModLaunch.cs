@@ -2306,6 +2306,7 @@ public static class ModLaunch
                 var hasExistingSaves = Directory.Exists(Path.Combine(ModInstanceList.McMcInstanceSelected.PathIndie, "saves"));
                 var shouldUseDefault = isLanguageUnconfigured || !hasExistingSaves;
                 var requiredLang = _ResolveMinecraftLanguage(currentLang, shouldUseDefault,
+                    ModInstanceList.McMcInstanceSelected.Info.VanillaName,
                     ModInstanceList.McMcInstanceSelected.releaseTime);
 
                 if (currentLang == requiredLang)
@@ -2359,11 +2360,11 @@ public static class ModLaunch
     }
 
     private static string _ResolveMinecraftLanguage(string? currentLanguage, bool shouldUseLauncherLanguage,
-        DateTime? mcReleaseTime)
+        string? mcVersionName, DateTime? mcReleaseTime)
     {
         if (_IsMinecraftVersionUnder1Dot1(mcReleaseTime)) return "none";
 
-        var useLegacyRegionCase = _ShouldUseLegacyMinecraftLanguageCode(mcReleaseTime);
+        var useLegacyRegionCase = _ShouldUseLegacyMinecraftLanguageCode(mcVersionName, mcReleaseTime);
         var languageCode = shouldUseLauncherLanguage
             ? LocalizationService.CurrentLanguage.Code
             : currentLanguage;
@@ -2392,8 +2393,14 @@ public static class ModLaunch
                releaseTime.Value <= new DateTime(2011, 11, 18);
     }
 
-    private static bool _ShouldUseLegacyMinecraftLanguageCode(DateTime? releaseTime)
+    private static bool _ShouldUseLegacyMinecraftLanguageCode(string? versionName, DateTime? releaseTime)
     {
+        // 不能只用 1.10 的首发日期判断，1.10.1/1.10.2 的发布日期更晚，但仍要求大写地区码。
+        var match = System.Text.RegularExpressions.Regex.Match(versionName ?? "", @"^1\.(\d+)(?:\.|$)");
+        if (match.Success && int.TryParse(match.Groups[1].Value, out var minorVersion))
+            return minorVersion is >= 1 and <= 10;
+
+        // 无法识别原版版本号时保留日期兜底，兼容旧实例与自定义版本。
         return releaseTime.HasValue &&
                releaseTime.Value >= new DateTime(2012, 1, 12) &&
                releaseTime.Value <= new DateTime(2016, 6, 8);
